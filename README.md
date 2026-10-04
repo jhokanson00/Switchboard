@@ -6,7 +6,7 @@ each showing its real current state. Plus a Pomodoro timer, CPU and GPU meters, 
 global keyboard shortcut for anything. Native Swift, very light on your Mac (it doesn't
 poll), free and open source.
 
-<p align="center"><img src="docs/screenshot.png" width="302" alt="The Switchboard panel"></p>
+<p align="center"><img src="docs/screenshot-1.0.1.png" width="302" alt="The Switchboard panel"></p>
 
 ## Download
 
