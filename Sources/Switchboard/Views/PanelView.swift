@@ -147,27 +147,20 @@ private struct Footer: View {
                     openWindow(id: ShortcutsView.windowID)
                     NSApp.activate()
                 }
-                .buttonStyle(.link)
-                .font(.caption)
-                Menu {
-                    Button("Check for Updates…") { Support.checkForUpdates() }
-                    Button("Report a Bug…") { Support.reportBug() }
-                    Button("Switchboard on GitHub") { Support.openRepo() }
-                    Divider()
-                    Text("Version \(Support.appVersion)")
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help("Updates, bug reports and more")
                 Button("Quit") { NSApp.terminate(nil) }
-                    .buttonStyle(.link)
-                    .font(.caption)
                     .keyboardShortcut("q")
             }
+            HStack(spacing: 12) {
+                Button("Check for Updates…") { Support.checkForUpdates() }
+                Button("Report a Bug…") { Support.reportBug() }
+                Spacer()
+                Button("v\(Support.shortVersion)") { Support.openRepo() }
+                    .foregroundStyle(.secondary)
+                    .help("Switchboard \(Support.appVersion) on GitHub")
+            }
         }
+        .buttonStyle(.link)
+        .font(.caption)
         .padding(.horizontal, 6)
     }
 }

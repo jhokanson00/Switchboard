@@ -13,7 +13,7 @@ poll), free and open source.
 **[Download the latest Switchboard](https://github.com/jhokanson00/Switchboard/releases/latest)**:
 open the `.dmg` and drag Switchboard to Applications, then open it. It lives in the menu
 bar as a light switch; there's no Dock icon. Switchboard checks for updates once a day,
-or choose **⋯ ▸ Check for Updates…** at the bottom of the panel.
+or choose **Check for Updates…** at the bottom of the panel.
 
 - macOS 15 or later. Apple silicon and Intel.
 - Signed with Developer ID and notarized by Apple.
@@ -109,7 +109,7 @@ interfaces) have no mute control; the Mute row says so for those.
 
 ## Report a bug
 
-Choose **⋯ ▸ Report a Bug…** at the bottom of the panel. It opens a GitHub issue with
+Choose **Report a Bug…** at the bottom of the panel. It opens a GitHub issue with
 your Switchboard and macOS versions filled in. Or
 [open an issue](https://github.com/jhokanson00/Switchboard/issues/new/choose) directly.
 

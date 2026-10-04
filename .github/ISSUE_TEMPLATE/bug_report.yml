@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! **Report a Bug…** in Switchboard's ⋯ menu fills in the versions below.
+        Thanks for reporting! **Report a Bug…** at the bottom of Switchboard's panel fills in the versions below.
   - type: textarea
     id: what-happened
     attributes:

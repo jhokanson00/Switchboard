@@ -39,6 +39,11 @@ enum Support {
         }
     }
 
+    /// "1.0.0".
+    static var shortVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+    }
+
     /// "1.0.0 (3)".
     static var appVersion: String {
         let info = Bundle.main.infoDictionary ?? [:]
