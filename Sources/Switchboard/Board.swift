@@ -161,7 +161,7 @@ final class Board {
         isEmptyingTrash = true
         defer { isEmptyingTrash = false }
         do {
-            let count = Int(try await AppleScript.run("tell application \"Finder\" to count items of trash").int32Value)
+            let count = Int(try await AppleScript.run("tell application \"Finder\" to count items of trash")) ?? 0
             guard count > 0 else {
                 actionNote = "The Trash is already empty."
                 return

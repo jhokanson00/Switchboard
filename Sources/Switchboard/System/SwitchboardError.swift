@@ -7,15 +7,23 @@ enum SwitchboardError: LocalizedError, Equatable {
     case timedOut
     case failed(String)
 
-    init(appleScriptError info: NSDictionary, source: String) {
-        let number = info[NSAppleScript.errorNumber] as? Int ?? 0
+    /// From osascript's error output, e.g.
+    /// "0:30: execution error: Not authorized to send Apple events to Finder. (-1743)".
+    init(osascriptError output: String, source: String) {
+        var message = output
+        if let range = message.range(of: "execution error: ") { message = String(message[range.upperBound...]) }
+        var number = 0
+        if let match = message.range(of: #"\((-?\d+)\)\s*$"#, options: .regularExpression) {
+            number = Int(message[match].trimmingCharacters(in: CharacterSet(charactersIn: "() \n"))) ?? 0
+            message = String(message[..<match.lowerBound]).trimmingCharacters(in: .whitespaces)
+        }
         switch number {
         case -1743:  // errAEEventNotPermitted
             self = .automationDenied(app: source.contains("\"Finder\"") ? "Finder" : "System Events")
         case -1712:  // errAETimeout
             self = .timedOut
         default:
-            self = .failed(info[NSAppleScript.errorMessage] as? String ?? "AppleScript error \(number).")
+            self = .failed(message.isEmpty ? "AppleScript error \(number)." : message)
         }
     }
 

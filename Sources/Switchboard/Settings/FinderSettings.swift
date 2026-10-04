@@ -2,19 +2,27 @@ import Foundation
 
 private let finder = "com.apple.finder"
 
-/// Finder's CreateDesktop preference. Finder only reads it at launch, so it restarts.
+/// Desktop icons can be hidden two ways: System Settings' "Show Items: On Desktop"
+/// (WindowManager's StandardHideDesktopIcons, macOS 14 and later) and Finder's older
+/// CreateDesktop. Either one hiding them counts as on; switching sets both, so icons
+/// stay hidden or shown whichever one a Mac honours. Finder only reads CreateDesktop at
+/// launch, so it restarts.
 @MainActor
 final class HideDesktopIcons: SystemSetting {
     let id = "hideDesktopIcons"
     let title = "Hide Desktop Icons"
     let symbol = "eye.slash"
 
+    private let windowManager = "com.apple.WindowManager"
+
     func read() -> Reading {
-        let showsIcons = Prefs.bool("CreateDesktop", in: finder) ?? true
-        return Reading(state: showsIcons ? .off : .on)
+        let hiddenBySystemSettings = Prefs.bool("StandardHideDesktopIcons", in: windowManager) ?? false
+        let hiddenByFinder = !(Prefs.bool("CreateDesktop", in: finder) ?? true)
+        return Reading(state: hiddenBySystemSettings || hiddenByFinder ? .on : .off)
     }
 
     func write(_ on: Bool) async throws {
+        Prefs.set("StandardHideDesktopIcons", on, in: windowManager)
         await FinderRestarter.shared.restart { Prefs.set("CreateDesktop", !on, in: finder) }
     }
 }
