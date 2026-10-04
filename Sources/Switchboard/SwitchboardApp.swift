@@ -4,6 +4,11 @@ import SwiftUI
 struct SwitchboardApp: App {
     @State private var board = Board()
 
+    init() {
+        // Start Sparkle so it can check for updates in the background.
+        _ = Support.updater
+    }
+
     var body: some Scene {
         MenuBarExtra {
             PanelView(board: board)

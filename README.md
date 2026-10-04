@@ -1,43 +1,82 @@
 # Switchboard
 
-A macOS menu bar panel of quick toggles. Each row shows the setting's real current
-state, and every switch can be flipped back.
+A Mac menu bar panel of quick toggles: Dark Mode, Night Shift, hiding desktop icons, the
+Dock or the menu bar, hidden files, mute, Bluetooth, keeping the Mac awake and more,
+each showing its real current state. Plus a Pomodoro timer, CPU and GPU meters, and a
+global keyboard shortcut for anything. Native Swift, very light on your Mac (it doesn't
+poll), free and open source.
 
-**Settings:** Dark Mode, Night Shift, Hide Desktop Icons, Hide Desktop Widgets, Autohide
-Dock, Autohide Menu Bar, Show Recent Apps in Dock, Show Hidden Files, Show Library Folder,
-Mute, Mute Microphone, Keep Awake (for a set time, or while an app is open), Bluetooth.
-**Actions:** Start Screen Saver, Empty Trash (asks first), Eject (USB sticks, SD cards,
-disk images and network drives; hard disks stay connected).
-**Pomodoro:** 5, 25, 30, 45 or 60-minute focus, 5-minute breaks, a 15-minute break after
-every fourth.
-**At a glance:** CPU and GPU load, sampled only while the panel is open.
-**Keyboard shortcuts:** any setting or action can have a global shortcut (Shortcuts… at
-the bottom of the panel). With the panel closed, a brief on-screen confirmation shows
-what changed. "Use Suggested" assigns ⌃⌥⌘ plus a letter to everything (⌃⌥⌘D Dark Mode,
-⌃⌥⌘M Mute, and so on); macOS uses ⌃⌥⌘ only with digits and punctuation.
+<p align="center"><img src="docs/panel.png" width="302" alt="The Switchboard panel"></p>
 
-Requires macOS 15 or later.
+## Download
 
-## Build and run
+**[Download the latest Switchboard](https://github.com/jhokanson00/Switchboard/releases/latest)**:
+open the `.dmg` and drag Switchboard to Applications, then open it. It lives in the menu
+bar as a light switch; there's no Dock icon. Switchboard checks for updates once a day,
+or choose **⋯ ▸ Check for Updates…** at the bottom of the panel.
 
-```sh
-make run     # build, install to /Applications, launch
-make test    # unit tests (Pomodoro timing, original-settings record)
-make debug   # debug build, run from ./build
-```
+- macOS 15 or later. Apple silicon and Intel.
+- Signed with Developer ID and notarized by Apple.
 
-`scripts/build-app.sh` signs with your Developer ID if one is installed, so macOS
-remembers the permissions between builds.
+## What's in it
 
-## Permissions
+**Settings**, each a switch that shows what macOS is set to right now:
+
+- **Appearance:** Dark Mode, Night Shift.
+- **Desktop & Dock:** Hide Desktop Icons, Hide Desktop Widgets, Autohide Dock, Autohide
+  Menu Bar, Show Recent Apps in Dock.
+- **Finder:** Show Hidden Files, Show Library Folder.
+- **System:** Mute, Mute Microphone, Keep Awake, Bluetooth.
+
+**Keep Awake** can run until you turn it off, for 1 to 8 hours, or while a particular app
+is open (say, until Final Cut Pro finishes and quits). Use the clock button on its row.
+
+**Actions:** Start Screen Saver; Empty Trash (always asks first, with the item count);
+Eject, which ejects disk images, network drives, USB sticks and SD cards but leaves hard
+disks connected. If something is holding a drive, Eject names the app.
+
+**Pomodoro:** focus for 5, 25, 30, 45 or 60 minutes, then a 5-minute break, with a
+15-minute break after every fourth session. While it runs, the minutes left show in the
+menu bar, and a notification arrives when each phase ends.
+
+**At a glance:** CPU and GPU load at the top of the panel.
+
+**Launch at Login** is a checkbox at the bottom.
+
+### Keyboard shortcuts
+
+Any setting or action can have a global shortcut that works from any app: choose
+**Shortcuts…** at the bottom of the panel. **Use Suggested** assigns ⌃⌥⌘ plus a letter to
+everything (⌃⌥⌘D Dark Mode, ⌃⌥⌘M Mute, ⌃⌥⌘V Mute Microphone, and so on). macOS uses
+⌃⌥⌘ only with digits and punctuation, and apps rarely use it at all. With the panel
+closed, a brief on-screen confirmation shows what changed.
+
+A Switchboard shortcut takes priority over the same shortcut inside another app. If one
+gets in the way, record a different one.
+
+### Undoing changes
+
+The first time Switchboard changes a setting, it remembers what it was. When any differ,
+**Restore original settings** appears at the bottom of the panel and puts them all back.
+Mute, Night Shift and Keep Awake are momentary, so they aren't included. Keep Awake also
+ends if Switchboard quits.
+
+Empty Trash is the one action that can't be undone, so it always asks first.
+
+## Privacy and permissions
+
+Switchboard runs entirely on your Mac. It has no accounts, analytics or tracking. Its
+only network request is the update check, which downloads a small file from this repo's
+GitHub releases.
+
+macOS asks for each permission the first time it's needed:
 
 - **Automation → System Events:** Dark Mode, Autohide Dock, Autohide Menu Bar.
-- **Automation → Finder:** Empty Trash.
+- **Automation → Finder:** Empty Trash, and reopening your Finder windows after a Finder
+  setting changes.
 - **Bluetooth:** showing and switching Bluetooth.
 
-macOS asks for each one the first time it's needed.
-
-## How each setting works
+## How it works
 
 | Setting | Changed with | How the row stays current |
 |---|---|---|
@@ -63,15 +102,47 @@ them, and everything else is reread when the panel opens. The Pomodoro timer wak
 most once a minute while it runs, to update the menu bar countdown, and the CPU and GPU
 meters sample every 2 seconds only while the panel is open.
 
-The two private APIs (Night Shift and switching Bluetooth) are looked up at run time.
-If a future macOS removes them, the row says so instead of crashing.
+Night Shift and switching Bluetooth have no public API. Switchboard uses the same
+private ones Control Center and `blueutil` use, looked up at run time. If a future
+macOS removes them, the row says so instead of crashing. Some audio devices (many USB
+interfaces) have no mute control; the Mute row says so for those.
 
-## Undoing changes
+## Report a bug
 
-The first time Switchboard changes a setting, it remembers the original value. When any
-differ, **Restore original settings** appears at the bottom of the panel and puts them
-back. Mute, Night Shift and Keep Awake are momentary, so they aren't included. Keep
-Awake also ends if Switchboard quits.
+Choose **⋯ ▸ Report a Bug…** at the bottom of the panel. It opens a GitHub issue with
+your Switchboard and macOS versions filled in. Or
+[open an issue](https://github.com/jhokanson00/Switchboard/issues/new/choose) directly.
 
-Empty Trash is the one action that can't be undone, so it always shows how many items
-will be deleted and asks first.
+## Building from source
+
+```bash
+make run     # build, install to /Applications, launch
+make test    # unit tests (Pomodoro timing, shortcuts, original-settings record)
+make debug   # debug build, run from ./build
+```
+
+You need Xcode 16 or later (Swift 6). `scripts/build-app.sh` signs with a Developer ID if one is
+installed, else a local signing identity, so macOS remembers the permissions between
+builds. `swift scripts/make-icon.swift` redraws the app icon.
+
+### Releasing
+
+```bash
+scripts/release.sh 1.0.0             # build, notarize, make the .dmg and appcast.xml
+scripts/release.sh 1.0.0 --publish   # also create the GitHub release
+```
+
+The script sets the version in `Resources/Info.plist`, builds a universal app signed
+with the Developer ID certificate in the keychain and the hardened runtime, notarizes
+and staples the app and the `.dmg`, and signs the `.dmg` for Sparkle with the EdDSA key
+in the keychain (`generate_keys --account Switchboard`; its public half is
+`SUPublicEDKey`). Each release carries its own `appcast.xml`, which the app reads from
+`releases/latest/download/appcast.xml`. Notarizing needs a stored profile, made once:
+
+```bash
+xcrun notarytool store-credentials pane-notary --apple-id <your Apple ID> --team-id <team ID>
+```
+
+## License
+
+MIT. See [LICENSE](LICENSE).

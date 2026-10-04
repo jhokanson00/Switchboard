@@ -37,6 +37,11 @@ struct PanelView: View {
                       : "Ejects " + board.drives.drives.map(\.name).joined(separator: ", ") + ". Hard disks stay connected.")
             }
             .padding(.horizontal, 6)
+            Text("Eject only removes disk images, network drives, USB sticks and SD cards. Hard disks stay connected.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 6)
 
             SectionHeader(title: "Pomodoro")
             PomodoroSection(model: board.pomodoro, isVisible: board.isPanelOpen)
@@ -58,6 +63,9 @@ struct PanelView: View {
         }
         .padding(10)
         .frame(width: 300)
+        // The menu bar panel's own glass is nearly clear on macOS 26 and later, so
+        // windows behind it showed through the rows. A solid backing keeps it readable.
+        .background(Color(nsColor: .windowBackgroundColor))
         .background(PanelVisibilityObserver { board.panelVisibilityChanged($0) })
     }
 }
@@ -141,6 +149,19 @@ private struct Footer: View {
                 }
                 .buttonStyle(.link)
                 .font(.caption)
+                Menu {
+                    Button("Check for Updates…") { Support.checkForUpdates() }
+                    Button("Report a Bug…") { Support.reportBug() }
+                    Button("Switchboard on GitHub") { Support.openRepo() }
+                    Divider()
+                    Text("Version \(Support.appVersion)")
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Updates, bug reports and more")
                 Button("Quit") { NSApp.terminate(nil) }
                     .buttonStyle(.link)
                     .font(.caption)

@@ -16,10 +16,15 @@ BIN_DIR="$(swift build -c "$CONFIG" ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-b
 
 APP="build/Switchboard.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/Switchboard" "$APP/Contents/MacOS/Switchboard"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-[ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+
+# Sparkle (updates). Switchboard isn't sandboxed, so Sparkle's XPC services aren't needed.
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+cp -R "$BIN_DIR/Sparkle.framework" "$SPARKLE"
+rm -rf "$SPARKLE/Versions/B/XPCServices" "$SPARKLE/XPCServices"
 
 # Signing identity: SWITCHBOARD_SIGN_IDENTITY if set, else a Developer ID, else a local
 # identity so macOS remembers the Bluetooth and Automation permissions across rebuilds,
@@ -37,10 +42,23 @@ fi
 # Hardened runtime always, so local builds behave like the notarized release. A secure
 # timestamp is required for notarization and only works with Apple-issued identities.
 SIGN=(codesign --force --options runtime --sign "${IDENTITY:--}")
+ENTITLEMENTS=Resources/Switchboard.entitlements
 case "$IDENTITY" in
   "Developer ID Application"*) SIGN+=(--timestamp) ;;
+  *)
+    # Without an Apple Team ID the runtime refuses to load Sparkle.framework, so local
+    # and ad-hoc builds allow libraries signed by anyone.
+    ENTITLEMENTS="build/Switchboard-local.entitlements"
+    cp Resources/Switchboard.entitlements "$ENTITLEMENTS"
+    /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-library-validation bool true" "$ENTITLEMENTS"
+    ;;
 esac
-"${SIGN[@]}" --entitlements Resources/Switchboard.entitlements "$APP"
+
+# Inside out: Sparkle's helpers, the framework, then the app.
+"${SIGN[@]}" "$SPARKLE/Versions/B/Autoupdate"
+"${SIGN[@]}" "$SPARKLE/Versions/B/Updater.app"
+"${SIGN[@]}" "$SPARKLE"
+"${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$APP"
 
 if [ -n "$IDENTITY" ]; then
   echo "Signed with: $IDENTITY"

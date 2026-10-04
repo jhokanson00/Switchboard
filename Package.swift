@@ -4,6 +4,10 @@ import PackageDescription
 let package = Package(
     name: "Switchboard",
     platforms: [.macOS(.v15)],
+    dependencies: [
+        // In-app updates from GitHub Releases ("Check for Updates…").
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0"),
+    ],
     targets: [
         // Pure logic (Pomodoro timing, preference parsing). No system calls, so it can
         // be tested on its own.
@@ -13,7 +17,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "Switchboard",
-            dependencies: ["SwitchboardKit"],
+            dependencies: ["SwitchboardKit", .product(name: "Sparkle", package: "Sparkle")],
             path: "Sources/Switchboard",
             linkerSettings: [
                 // Embed Info.plist in the binary so the Bluetooth and Automation usage
@@ -24,6 +28,9 @@ let package = Package(
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
                     "-Xlinker", "\(Context.packageDirectory)/Resources/Info.plist",
+                    // Sparkle.framework is copied into Contents/Frameworks by build-app.sh.
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "@executable_path/../Frameworks",
                 ])
             ]
         ),

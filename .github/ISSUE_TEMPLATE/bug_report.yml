@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in Switchboard doesn't work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Report a Bug…** in Switchboard's ⋯ menu fills in the versions below.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Which setting or action, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Switchboard
+        2. Turn on …
+        3. …
+  - type: input
+    id: app-version
+    attributes:
+      label: Switchboard version
+      placeholder: "1.0.0 (2)"
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: "27.0 (26A428)"
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac
+      placeholder: "Mac15,3, Apple silicon"
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Displays, audio devices, drives, or other menu bar apps that change the same settings.

@@ -23,12 +23,18 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Switchboard asks System Events to switch Dark Mode and Dock and menu bar hiding, and asks Finder to empty the Trash.</string>
+	<string>Switchboard asks System Events to switch Dark Mode and Dock and menu bar hiding, and asks Finder to empty the Trash and to reopen your folders after a Finder setting changes.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Switchboard shows whether Bluetooth is on and turns it on or off when you ask.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>© 2026 Jacob Hokanson.</string>
+	<string>© 2026 Jacob Hokanson. MIT License.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/jhokanson00/Switchboard/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>TDDY1E5JvVcKlaAAspcGfm9+dYwKri8MPzqGBetKe2s=</string>
 </dict>
 </plist>
