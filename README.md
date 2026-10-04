@@ -6,7 +6,7 @@ each showing its real current state. Plus a Pomodoro timer, CPU and GPU meters, 
 global keyboard shortcut for anything. Native Swift, very light on your Mac (it doesn't
 poll), free and open source.
 
-<p align="center"><img src="docs/panel.png" width="302" alt="The Switchboard panel"></p>
+<p align="center"><img src="docs/screenshot.png" width="302" alt="The Switchboard panel"></p>
 
 ## Download
 
@@ -126,6 +126,9 @@ installed, else a local signing identity, so macOS remembers the permissions bet
 builds. `swift scripts/make-icon.swift` redraws the app icon.
 
 ### Releasing
+
+Write the release notes first, in `docs/release-notes/<version>.md` (paragraphs and
+`- ` bullets). They appear in the app's update window and on the GitHub release.
 
 ```bash
 scripts/release.sh 1.0.0             # build, notarize, make the .dmg and appcast.xml

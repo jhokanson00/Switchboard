@@ -5,6 +5,8 @@
 #   scripts/release.sh 1.0.0             # build into build/release/, publish nothing
 #   scripts/release.sh 1.0.0 --publish   # also create the GitHub release v1.0.0
 #
+# Release notes come from docs/release-notes/<version>.md: they're shown in the app's
+# update window and on the GitHub release. Write them first.
 # Sets the version in Resources/Info.plist (and bumps the build number); commit that.
 # Notarizing needs a stored notarytool profile, made once with:
 #   xcrun notarytool store-credentials pane-notary --apple-id <id> --team-id <team>
@@ -17,6 +19,12 @@ PUBLISH=0
 [ "${2:-}" = "--publish" ] && PUBLISH=1
 if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
   echo "Usage: scripts/release.sh <version, e.g. 1.0.0> [--publish]" >&2
+  exit 1
+fi
+
+NOTES="docs/release-notes/$VERSION.md"
+if [ ! -f "$NOTES" ]; then
+  echo "Write the release notes in $NOTES first." >&2
   exit 1
 fi
 
@@ -85,6 +93,13 @@ fi
 # Info.plist).
 echo "==> Writing appcast.xml"
 SIGNATURE="$("$SPARKLE_BIN/sign_update" --account Switchboard "$DMG")"
+# The notes are embedded as HTML, so Sparkle's window shows them on a plain background
+# instead of loading the GitHub page.
+NOTES_HTML="$(swift scripts/notes-html.swift "$NOTES")"
+if [[ "$NOTES_HTML" == *"]]>"* ]]; then
+  echo "$NOTES can't contain ']]>'." >&2
+  exit 1
+fi
 MIN_OS="$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$PLIST")"
 cat > "$OUT/appcast.xml" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
@@ -97,7 +112,7 @@ cat > "$OUT/appcast.xml" <<EOF
       <sparkle:version>$BUILD</sparkle:version>
       <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>$MIN_OS</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/$REPO/releases/tag/v$VERSION</sparkle:releaseNotesLink>
+      <description><![CDATA[$NOTES_HTML]]></description>
       <enclosure url="https://github.com/$REPO/releases/download/v$VERSION/Switchboard-$VERSION.dmg"
                  type="application/octet-stream" $SIGNATURE />
     </item>
@@ -105,10 +120,12 @@ cat > "$OUT/appcast.xml" <<EOF
 </rss>
 EOF
 
-# Release notes, edited on GitHub afterwards if needed.
+# The GitHub release: the same notes, plus how to install.
 {
+  cat "$NOTES"
+  echo
   echo "Download **Switchboard-$VERSION.dmg** below, open it, and drag Switchboard to Applications."
-  echo "It lives in the menu bar (the light switch icon)."
+  echo "It lives in the menu bar as a light switch. Already have it? Choose **Check for Updates…** at the bottom of the panel."
   echo
   echo "Requires macOS $MIN_OS or later. Runs on Apple silicon and Intel."
 } > "$OUT/notes.md"
