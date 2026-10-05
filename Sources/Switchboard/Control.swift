@@ -42,6 +42,9 @@ protocol SystemSetting: AnyObject {
     /// Settings that macOS announces changes for call `changed` when they do. The
     /// rest are read again when the panel opens.
     func startObserving(_ changed: @escaping @MainActor () -> Void)
+    /// For a setting that needs a permission macOS hasn't asked about yet: asks. Nil
+    /// otherwise. The row offers it while the setting reads as unavailable.
+    var askForPermission: (() -> Void)? { get }
 }
 
 extension SystemSetting {
@@ -49,6 +52,7 @@ extension SystemSetting {
     var closesPanel: Bool { false }
     func confirmChange(to on: Bool) async -> Bool { true }
     func startObserving(_ changed: @escaping @MainActor () -> Void) {}
+    var askForPermission: (() -> Void)? { nil }
 }
 
 @MainActor

@@ -63,10 +63,16 @@ struct ToggleRow: View {
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)
         } else if case .unavailable(let reason) = state {
-            Text(reason)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 4) {
+                Text(reason)
+                    .foregroundStyle(.secondary)
+                if let ask = control.setting.askForPermission {
+                    Button("Allow…", action: ask)
+                        .buttonStyle(.link)
+                }
+            }
+            .font(.caption)
+            .fixedSize(horizontal: false, vertical: true)
         } else if let detail = control.reading.detail {
             Text(detail)
                 .font(.caption)

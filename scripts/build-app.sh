@@ -18,6 +18,18 @@ APP="build/Switchboard.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/Switchboard" "$APP/Contents/MacOS/Switchboard"
+# The only library loaded through @rpath is Sparkle, from inside the app. SwiftPM also
+# adds its toolchain folder and @loader_path, which would be searched before it; remove
+# everything but the app's Frameworks folder and the system's Swift libraries.
+otool -l "$APP/Contents/MacOS/Switchboard" \
+  | awk '/cmd LC_RPATH/ { getline; getline; sub(/^ *path /, ""); sub(/ \(offset [0-9]+\)$/, ""); print }' \
+  | sort -u \
+  | while IFS= read -r rpath; do
+      case "$rpath" in
+        "@executable_path/../Frameworks" | /usr/lib/swift) ;;
+        *) install_name_tool -delete_rpath "$rpath" "$APP/Contents/MacOS/Switchboard" ;;
+      esac
+    done
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
@@ -45,9 +57,11 @@ SIGN=(codesign --force --options runtime --sign "${IDENTITY:--}")
 ENTITLEMENTS=Resources/Switchboard.entitlements
 case "$IDENTITY" in
   "Developer ID Application"*) SIGN+=(--timestamp) ;;
+  "Apple Development"*) ;;
   *)
-    # Without an Apple Team ID the runtime refuses to load Sparkle.framework, so local
-    # and ad-hoc builds allow libraries signed by anyone.
+    # Without an Apple Team ID the runtime refuses to load Sparkle.framework, so
+    # ad-hoc and self-signed local builds allow libraries signed by anyone. Never in a
+    # release: release.sh refuses any entitlement but Apple Events.
     ENTITLEMENTS="build/Switchboard-local.entitlements"
     cp Resources/Switchboard.entitlements "$ENTITLEMENTS"
     /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-library-validation bool true" "$ENTITLEMENTS"

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Builds a release of Switchboard: a universal app in a .dmg, notarized when a Developer
-# ID certificate is installed, plus the appcast.xml that Sparkle reads for updates.
+# Builds a release of Switchboard from the committed source on main: a universal app in
+# a .dmg, notarized, plus the signed appcast.xml that Sparkle reads for updates. It
+# publishes nothing; scripts/publish.sh does that once the version change is pushed.
 #
-#   scripts/release.sh 1.0.0             # build into build/release/, publish nothing
-#   scripts/release.sh 1.0.0 --publish   # also create the GitHub release v1.0.0
+#   scripts/release.sh 1.0.0   # build into build/release/
+#
+# Without a Developer ID certificate it makes a test build only: not notarized, not
+# signed for updates, and refused by publish.sh.
 #
 # Release notes come from docs/release-notes/<version>.md: they're shown in the app's
-# update window and on the GitHub release. Write them first.
+# update window and on the GitHub release. Write and commit them first.
 # Sets the version in Resources/Info.plist (and bumps the build number); commit that.
 # Notarizing needs a stored notarytool profile, made once with:
 #   xcrun notarytool store-credentials pane-notary --apple-id <id> --team-id <team>
@@ -15,10 +18,19 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="${1:-}"
-PUBLISH=0
-[ "${2:-}" = "--publish" ] && PUBLISH=1
-if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-  echo "Usage: scripts/release.sh <version, e.g. 1.0.0> [--publish]" >&2
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || [ $# -ne 1 ]; then
+  echo "Usage: scripts/release.sh <version, e.g. 1.0.0>   (then scripts/publish.sh <version>)" >&2
+  exit 1
+fi
+
+# Only committed source on main goes out, never a local experiment.
+if [ "$(git rev-parse --abbrev-ref HEAD)" != main ]; then
+  echo "Check out main first: releases are built from main." >&2
+  exit 1
+fi
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Commit or stash your changes first: a release is built from the committed source." >&2
+  git status --short >&2
   exit 1
 fi
 
@@ -50,12 +62,9 @@ SIGNED_BY="$(codesign -dv --verbose=2 "$APP" 2>&1 | sed -n 's/^Authority=\(Devel
 NOTARIZE=0
 if [ -n "$SIGNED_BY" ]; then
   NOTARIZE=1
-elif [ "$PUBLISH" = 1 ]; then
-  echo "No Developer ID Application certificate in the keychain; only notarized builds are published." >&2
-  exit 1
 else
   echo
-  echo "!! No Developer ID certificate: making a TEST build (not notarized, not for publishing)."
+  echo "!! No Developer ID certificate: making a TEST build (not notarized, not signed for updates)."
   echo
 fi
 
@@ -72,6 +81,7 @@ if [ "$NOTARIZE" = 1 ]; then
   notarize "$OUT/Switchboard.zip"
   xcrun stapler staple "$APP"
   rm "$OUT/Switchboard.zip"
+  scripts/check-app.sh "$APP" "$VERSION"
 fi
 
 echo "==> Making $DMG"
@@ -86,6 +96,11 @@ if [ "$NOTARIZE" = 1 ]; then
   notarize "$DMG"
   xcrun stapler staple "$DMG"
   spctl --assess --type open --context context:primary-signature -v "$DMG"
+else
+  echo
+  echo "Test build: $DMG"
+  echo "Not notarized and not signed for Sparkle, so it can't be published or offered as an update."
+  exit 0
 fi
 
 # Sparkle: the update is the .dmg itself, signed with the EdDSA key in the keychain
@@ -119,6 +134,10 @@ cat > "$OUT/appcast.xml" <<EOF
   </channel>
 </rss>
 EOF
+# Sign the feed itself, so a changed appcast (other notes, links, versions) is refused
+# by Switchboard (SURequireSignedFeed). Nothing may edit it after this.
+"$SPARKLE_BIN/sign_update" --account Switchboard "$OUT/appcast.xml"
+"$SPARKLE_BIN/sign_update" --account Switchboard --verify "$OUT/appcast.xml"
 
 # The GitHub release: the same notes, plus how to install.
 {
@@ -133,13 +152,6 @@ EOF
 echo
 echo "Built:"
 ls -lh "$OUT"
-
-if [ "$PUBLISH" = 1 ]; then
-  echo "==> Publishing GitHub release v$VERSION"
-  gh release create "v$VERSION" "$DMG" "$OUT/appcast.xml" \
-    --repo "$REPO" --title "Switchboard $VERSION" --notes-file "$OUT/notes.md"
-else
-  echo
-  echo "Not published. Commit Resources/Info.plist, then rerun with --publish, or:"
-  echo "  gh release create v$VERSION $DMG $OUT/appcast.xml --repo $REPO --title \"Switchboard $VERSION\" --notes-file $OUT/notes.md"
-fi
+echo
+echo "Next: commit Resources/Info.plist (\"Version $VERSION (build $BUILD)\"), push main, then"
+echo "  scripts/publish.sh $VERSION"

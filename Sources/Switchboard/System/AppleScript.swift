@@ -6,7 +6,8 @@ import Foundation
 /// Finder restarts it could wait forever on the Finder that quit, past its own timeout,
 /// blocking every script after it. A separate process starts fresh each time, and one
 /// that hangs is simply stopped. macOS still attributes the Apple Events to Switchboard,
-/// so the Automation permissions are the same.
+/// so the Automation permissions are the same. The script goes in on standard input, not
+/// the command line, which any process can read (it can contain folder paths).
 enum AppleScript {
     /// Runs `source` and returns what it returns, as text.
     /// - Parameter timeout: How long each Apple Event may wait for a reply. The process
@@ -17,9 +18,10 @@ enum AppleScript {
         return try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            process.arguments = script.components(separatedBy: "\n").flatMap { ["-e", $0] }
+            let input = Pipe()
             let output = Pipe()
             let errors = Pipe()
+            process.standardInput = input
             process.standardOutput = output
             process.standardError = errors
 
@@ -40,10 +42,22 @@ enum AppleScript {
             }
             do {
                 try process.run()
-                DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(timeout + 5), execute: stop)
             } catch {
                 continuation.resume(throwing: SwitchboardError.failed("Couldn't run AppleScript: \(error.localizedDescription)"))
+                return
             }
+            // Small enough to fit in the pipe, so writing doesn't wait for osascript. If
+            // osascript is already gone, the write fails instead of raising SIGPIPE, which
+            // would quit Switchboard; the termination handler then reports it.
+            let writer = input.fileHandleForWriting
+            _ = fcntl(writer.fileDescriptor, F_SETNOSIGPIPE, 1)
+            do {
+                try writer.write(contentsOf: Data(script.utf8))
+                try writer.close()
+            } catch {
+                process.terminate()
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(timeout + 5), execute: stop)
         }
     }
 }

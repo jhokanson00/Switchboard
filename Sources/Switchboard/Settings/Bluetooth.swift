@@ -3,7 +3,8 @@ import CoreBluetooth
 import IOBluetooth
 
 /// Reads Bluetooth's power state through public CoreBluetooth, which also announces
-/// changes. Switching it uses IOBluetoothPreferenceSetControllerPowerState, a private
+/// changes. CoreBluetooth makes macOS ask for permission, so until it has asked, the
+/// row offers to (rather than every new user being asked at launch). Switching it uses IOBluetoothPreferenceSetControllerPowerState, a private
 /// function in the public IOBluetooth framework (what `blueutil` uses). It's looked up
 /// at run time, so if it disappears the row says so instead of crashing.
 @MainActor
@@ -28,6 +29,8 @@ final class Bluetooth: NSObject, SystemSetting, CBCentralManagerDelegate {
         switch CBManager.authorization {
         case .denied, .restricted:
             return Reading(state: .unavailable("Allow Bluetooth for Switchboard in Privacy & Security"))
+        case .notDetermined where manager == nil:
+            return Reading(state: .unavailable("Needs your permission to see Bluetooth"))
         default:
             break
         }
@@ -67,6 +70,19 @@ final class Bluetooth: NSObject, SystemSetting, CBCentralManagerDelegate {
 
     func startObserving(_ changed: @escaping @MainActor () -> Void) {
         self.changed = changed
+        if CBManager.authorization != .notDetermined { startManager() }
+    }
+
+    var askForPermission: (() -> Void)? {
+        guard manager == nil, CBManager.authorization == .notDetermined else { return nil }
+        return { [weak self] in
+            self?.startManager()
+            self?.changed?()
+        }
+    }
+
+    private func startManager() {
+        guard manager == nil else { return }
         manager = CBCentralManager(delegate: self, queue: .main, options: [CBCentralManagerOptionShowPowerAlertKey: false])
     }
 
