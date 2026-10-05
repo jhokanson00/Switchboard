@@ -59,6 +59,9 @@ final class AudioMute: SystemSetting {
     private static let candidateElements: [AudioObjectPropertyElement] = [kAudioObjectPropertyElementMain, 1, 2]
 
     func read() -> Reading {
+        // Names and streams can change without the device list changing (a device renamed,
+        // or an aggregate device given its sub-devices in Audio MIDI Setup).
+        loadDevices()
         guard device != kAudioObjectUnknown else {
             return Reading(state: .unavailable(direction == .output ? "No sound output" : "No microphone"))
         }
