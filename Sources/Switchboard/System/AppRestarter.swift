@@ -1,5 +1,13 @@
 import AppKit
 
+/// The running copies of an app. NSRunningApplication's own lookup by bundle ID
+/// sometimes comes back empty while the app is running (seen with Finder on macOS 27),
+/// which made a restart skip the quit; the workspace's list doesn't.
+@MainActor
+private func runningApplications(_ bundleID: String) -> [NSRunningApplication] {
+    NSWorkspace.shared.runningApplications.filter { $0.bundleIdentifier == bundleID && !$0.isTerminated }
+}
+
 /// Restarts the Dock so it rereads its preferences, like `killall Dock`. launchd starts
 /// it again at once. Requests that arrive close together share one restart.
 @MainActor
@@ -14,7 +22,7 @@ final class DockRestarter {
         let task = Task {
             // Gather any other changes made in the same moment.
             try? await Task.sleep(for: .milliseconds(300))
-            for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleID) {
+            for app in runningApplications(self.bundleID) {
                 kill(app.processIdentifier, SIGTERM)
             }
             self.pending = nil
@@ -68,11 +76,10 @@ final class FinderRestarter {
             batch.forEach { $0() }
         }
 
-        if running().isEmpty {
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = true
-            _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
-        }
+        // If macOS already started it again, this just brings it forward.
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
         await reopen(folders)
     }
 
@@ -117,22 +124,23 @@ final class FinderRestarter {
         if await waitForExit(of: pids, seconds: 5) { return true }
         // Finder didn't respond to Quit. Forced, it saves nothing on the way out, and
         // macOS starts it again with the settings already written.
-        running().filter { pids.contains($0.processIdentifier) }.forEach { $0.forceTerminate() }
+        apps.forEach { $0.forceTerminate() }
         _ = await waitForExit(of: pids, seconds: 3)
         return false
     }
 
-    /// Checks every 0.1 s, only while a restart is in progress.
+    /// Checks every 0.1 s, only while a restart is in progress. Asks the system about
+    /// each process directly, since the workspace's list catches up a moment later.
     private func waitForExit(of pids: Set<pid_t>, seconds: Int) async -> Bool {
+        func exited() -> Bool { pids.allSatisfy { kill($0, 0) != 0 && errno == ESRCH } }
         for _ in 0..<(seconds * 10) {
-            if !running().contains(where: { pids.contains($0.processIdentifier) }) { return true }
+            if exited() { return true }
             try? await Task.sleep(for: .milliseconds(100))
         }
-        return !running().contains(where: { pids.contains($0.processIdentifier) })
+        return exited()
     }
 
     private func running() -> [NSRunningApplication] {
-        NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
-            .filter { !$0.isTerminated }
+        runningApplications(bundleID)
     }
 }

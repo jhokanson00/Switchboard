@@ -82,7 +82,7 @@ macOS asks for each permission the first time it's needed:
 |---|---|---|
 | Dark Mode | System Events `dark mode` | Follows the app's appearance (notified) |
 | Night Shift | CoreBrightness `CBBlueLightClient` (private) | Status callback (notified) |
-| Hide Desktop Icons | `com.apple.finder CreateDesktop`, written while Finder is quit | Reread when the panel opens |
+| Hide Desktop Icons | `com.apple.WindowManager StandardHideDesktopIcons` (an old `com.apple.finder CreateDesktop` is undone with a Finder restart) | Reread when the panel opens |
 | Hide Desktop Widgets | `com.apple.WindowManager StandardHideWidgets` | Reread when the panel opens |
 | Autohide Dock | System Events `autohide` | Reread when the panel opens |
 | Autohide Menu Bar | System Events `autohide menu bar` (`_HIHideMenuBar`) | Reread when the panel opens |

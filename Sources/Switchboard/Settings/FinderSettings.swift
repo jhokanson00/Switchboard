@@ -2,11 +2,13 @@ import Foundation
 
 private let finder = "com.apple.finder"
 
-/// Desktop icons can be hidden two ways: System Settings' "Show Items: On Desktop"
-/// (WindowManager's StandardHideDesktopIcons, macOS 14 and later) and Finder's older
-/// CreateDesktop. Either one hiding them counts as on; switching sets both, so icons
-/// stay hidden or shown whichever one a Mac honours. Finder only reads CreateDesktop at
-/// launch, so it restarts.
+/// "Show Items: On Desktop" in System Settings → Desktop & Dock, stored as
+/// WindowManager's StandardHideDesktopIcons. The desktop follows it at once. Items in
+/// Stage Manager have their own setting, which is left alone.
+///
+/// Finder's older CreateDesktop hides the icons too, and Switchboard 1.0.x used it, so
+/// it counts as on as well. Showing the icons again turns it back on, which needs a
+/// Finder restart because Finder only reads it at launch.
 @MainActor
 final class HideDesktopIcons: SystemSetting {
     let id = "hideDesktopIcons"
@@ -16,14 +18,19 @@ final class HideDesktopIcons: SystemSetting {
     private let windowManager = "com.apple.WindowManager"
 
     func read() -> Reading {
-        let hiddenBySystemSettings = Prefs.bool("StandardHideDesktopIcons", in: windowManager) ?? false
-        let hiddenByFinder = !(Prefs.bool("CreateDesktop", in: finder) ?? true)
-        return Reading(state: hiddenBySystemSettings || hiddenByFinder ? .on : .off)
+        let hidden = Prefs.bool("StandardHideDesktopIcons", in: windowManager) ?? false
+        return Reading(state: hidden || finderHidesDesktop ? .on : .off)
     }
 
     func write(_ on: Bool) async throws {
         Prefs.set("StandardHideDesktopIcons", on, in: windowManager)
-        await FinderRestarter.shared.restart { Prefs.set("CreateDesktop", !on, in: finder) }
+        if !on && finderHidesDesktop {
+            await FinderRestarter.shared.restart { Prefs.set("CreateDesktop", true, in: finder) }
+        }
+    }
+
+    private var finderHidesDesktop: Bool {
+        !(Prefs.bool("CreateDesktop", in: finder) ?? true)
     }
 }
 
