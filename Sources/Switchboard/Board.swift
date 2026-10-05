@@ -295,7 +295,10 @@ final class Board {
         let setting = control.setting
         control.refresh()
         guard let current = control.reading.state.isOn else {
-            if case .unavailable(let reason) = control.reading.state {
+            // A new user's first press asks for the permission, as the row's Allow… does.
+            if let ask = setting.askForPermission {
+                ask()
+            } else if case .unavailable(let reason) = control.reading.state {
                 showHUD(symbol: setting.symbol, title: setting.title, detail: reason)
             }
             return
