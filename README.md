@@ -16,7 +16,8 @@ bar as a light switch; there's no Dock icon. Switchboard checks for updates once
 or choose **Check for Updates…** at the bottom of the panel.
 
 - macOS 15 or later. Apple silicon and Intel.
-- Signed with Developer ID and notarized by Apple.
+- Signed with Developer ID and notarized by Apple; updates are signed too. See
+  [Privacy and security](#privacy-and-security).
 
 ## What's in it
 
@@ -72,7 +73,7 @@ ends if Switchboard quits.
 
 Empty Trash is the one action that can't be undone, so it always asks first.
 
-## Privacy and permissions
+## Privacy and security
 
 Switchboard runs entirely on your Mac. It has no accounts, analytics or tracking. Its
 only network request is the update check, which downloads a small file from this repo's
@@ -83,7 +84,61 @@ macOS asks for each permission the first time it's needed:
 - **Automation → System Events:** Dark Mode, Autohide Dock, Autohide Menu Bar.
 - **Automation → Finder:** Empty Trash, and reopening your Finder windows after a Finder
   setting changes.
-- **Bluetooth:** showing and switching Bluetooth.
+- **Bluetooth:** only once you click **Allow…** on the Bluetooth row.
+- **Notifications:** only if you turn off the Pomodoro pop-up.
+
+Switchboard never listens to your microphone. Mute Microphone flips the microphone's own
+mute switch, and the app isn't entitled to record audio, so macOS wouldn't even let it ask.
+
+### What keeps your Mac safe
+
+- **Signed and notarized.** Every release is signed with the developer's Developer ID
+  and notarized by Apple, so macOS confirms it came from the developer and hasn't been
+  changed.
+- **One extra capability.** Switchboard runs with the hardened runtime and asks macOS for
+  a single entitlement: sending Apple Events, to System Events and Finder. It can't be
+  attached to by other apps, ignores code-injection environment variables, and loads only
+  code signed by Apple or its developer, from inside the app. So other software can't
+  slip code into it and borrow the permissions you've given it.
+- **Nothing else can drive it.** No URL scheme, no AppleScript dictionary, no services,
+  no network ports. It acts only on your clicks and your keyboard shortcuts.
+- **No shell.** The AppleScript it runs goes to Apple's own `osascript`, never a shell.
+  The only outside text that reaches a script, a Finder folder's path, is escaped and
+  passed privately, not on a command line other programs can read.
+- **Updates that can't be forged.** Sparkle checks once a day over HTTPS. The update feed
+  and every download are signed with the developer's private key, which never leaves the
+  developer's Mac, and Switchboard checks both against the key built into it before
+  anything is unpacked. It won't install an older version. (The feed itself is signed
+  from 1.0.5 on.)
+- **Releases that can't be swapped.** Published releases on this repo are immutable and
+  their tags protected, so a download can't be replaced once it's out. Before anything is
+  published, a script checks the app inside the `.dmg` again: signature, notarization,
+  entitlements and update key.
+- **One dependency.** [Sparkle](https://sparkle-project.org), for updates, pinned to an
+  exact version and checksum, with GitHub's security alerts on.
+
+Switchboard isn't sandboxed: its job is changing settings that belong to Finder, the Dock
+and macOS, which the App Sandbox doesn't allow. The protections above are what keep that
+safe.
+
+To check your copy:
+
+```bash
+spctl -a -vv /Applications/Switchboard.app
+```
+
+It should say `source=Notarized Developer ID` and
+`origin=Developer ID Application: JACOB LARS HOKANSON (DHGK36B2V9)`.
+
+```bash
+codesign -d --entitlements - /Applications/Switchboard.app
+```
+
+It should list only `com.apple.security.automation.apple-events`.
+
+**Found a security problem?** Please report it privately, not in a public issue:
+[Report a vulnerability](https://github.com/jhokanson00/Switchboard/security/advisories/new).
+See [SECURITY.md](SECURITY.md).
 
 ## How it works
 
