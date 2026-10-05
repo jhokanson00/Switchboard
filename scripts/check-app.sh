@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Checks that a built Switchboard.app is fit to hand to users, and fails loudly if not:
-# Developer ID signed with the hardened runtime throughout, no entitlement but Apple
-# Events (nothing that lets other code into the app), Sparkle loaded only from inside
-# the app, updates set up so they keep working (the pinned update key, signed feeds),
+# signed with the developer's Developer ID and the hardened runtime throughout, no
+# entitlement but Apple Events (nothing that lets other code into the app), Sparkle
+# loaded only from inside the app, built for Apple silicon and Intel on the macOS it
+# promises, updates set up so they keep working (the pinned update key, signed feeds),
 # and notarized. release.sh runs it on the build, publish.sh on the app in the .dmg.
 #
 #   scripts/check-app.sh path/to/Switchboard.app [version]
@@ -13,6 +14,9 @@ VERSION="${2:-}"
 BIN="$APP/Contents/MacOS/Switchboard"
 PLIST="$APP/Contents/Info.plist"
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+# The developer's team. Another team's Developer ID would pass Gatekeeper, but macOS
+# would forget every permission users gave Switchboard.
+TEAM=DHGK36B2V9
 fail() { echo "check-app: $*" >&2; exit 1; }
 
 codesign --verify --deep --strict "$APP" 2>/dev/null || fail "the signature doesn't verify"
@@ -20,6 +24,7 @@ codesign --verify --deep --strict "$APP" 2>/dev/null || fail "the signature does
 for code in "$APP" "$SPARKLE/Sparkle" "$SPARKLE/Autoupdate" "$SPARKLE/Updater.app"; do
   info="$(codesign -dvv "$code" 2>&1)"
   grep -q '^Authority=Developer ID Application: ' <<<"$info" || fail "$(basename "$code") isn't signed with a Developer ID"
+  grep -q "^TeamIdentifier=$TEAM\$" <<<"$info" || fail "$(basename "$code") isn't signed by team $TEAM"
   grep -q '^CodeDirectory .*flags=.*runtime' <<<"$info" || fail "$(basename "$code") doesn't use the hardened runtime"
 done
 
@@ -57,6 +62,20 @@ key() { plutil -extract "$1" raw "$PLIST" 2>/dev/null || echo "(missing)"; }
   || fail "unexpected SUFeedURL: $(key SUFeedURL)"
 [ "$(key SURequireSignedFeed)" = true ] || fail "SURequireSignedFeed isn't on"
 [ "$(key SUVerifyUpdateBeforeExtraction)" = true ] || fail "SUVerifyUpdateBeforeExtraction isn't on"
+
+# Apple silicon and Intel, on every macOS the feed offers it to (LSMinimumSystemVersion).
+# An update that can't launch could never be fixed by another one.
+MIN_OS="$(key LSMinimumSystemVersion)"
+for code in "$BIN" "$SPARKLE/Sparkle" "$SPARKLE/Autoupdate"; do
+  archs="$(lipo -archs "$code")"
+  [ "$archs" = "x86_64 arm64" ] || fail "$(basename "$code") is built for $archs, not Apple silicon and Intel"
+  for arch in x86_64 arm64; do
+    build="$(vtool -arch "$arch" -show-build "$code")"
+    minos="$(awk '$1 == "minos" { print $2 }' <<<"$build" | sed -n 1p)"
+    [ -n "$minos" ] && [ "$(printf '%s\n' "$minos" "$MIN_OS" | sort -V | sed -n 1p)" = "$minos" ] \
+      || fail "$(basename "$code") ($arch) needs macOS ${minos:-?}, but Switchboard promises $MIN_OS"
+  done
+done
 
 xcrun stapler validate -q "$APP" || fail "not notarized (no stapled ticket)"
 spctl --assess --type execute "$APP" 2>/dev/null || fail "Gatekeeper rejects it"

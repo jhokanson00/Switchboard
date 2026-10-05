@@ -200,7 +200,7 @@ GitHub release.
 
 ```bash
 scripts/release.sh 1.0.0   # on a clean main: build, notarize, make the .dmg and the signed appcast.xml
-git commit -am "Version 1.0.0 (build N)" && git push
+git commit -m "Version 1.0.0 (build N)" Resources/Info.plist && git push
 scripts/publish.sh 1.0.0   # check everything again, then create the GitHub release
 ```
 
@@ -209,14 +209,17 @@ scripts/publish.sh 1.0.0   # check everything again, then create the GitHub rele
 in the keychain and the hardened runtime, notarizes and staples the app and the `.dmg`,
 signs the `.dmg` and then the whole `appcast.xml` for Sparkle with the EdDSA key in the
 keychain (`generate_keys --account Switchboard`; its public half is `SUPublicEDKey`),
-and runs `scripts/check-app.sh`, which refuses any entitlement but Apple Events, any
-library search path outside the app (other than the system's Swift libraries), and
-anything not notarized. Without a Developer ID
-certificate it makes a test build that can't be published. `publish.sh` repeats the
-checks on the app inside the `.dmg`, verifies both signatures, and only publishes from
-the pushed commit that sets the version. Each release carries its own `appcast.xml`,
-which the app reads from `releases/latest/download/appcast.xml`. Notarizing needs a
-stored profile, made once:
+and runs `scripts/check-app.sh`, which refuses another team's signature, any entitlement
+but Apple Events, any library search path outside the app (other than the system's Swift
+libraries), a missing Apple silicon or Intel build, and anything not notarized. Without
+a Developer ID certificate it makes a test build that can't be published; if a build
+fails, `Info.plist` is put back so it can be run again. `publish.sh` repeats the checks
+on the app inside the `.dmg`, verifies both signatures, and only publishes from the
+pushed commit that adds just the version change to the source that was built. It
+uploads the release as a draft, checks GitHub holds exactly those files, and only then
+publishes it, since a published release can't be changed. Each release carries its own
+`appcast.xml`, which the app reads from `releases/latest/download/appcast.xml`.
+Notarizing needs a stored profile, made once:
 
 ```bash
 xcrun notarytool store-credentials pane-notary --apple-id <your Apple ID> --team-id <team ID>

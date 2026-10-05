@@ -11,6 +11,8 @@
 # Release notes come from docs/release-notes/<version>.md: they're shown in the app's
 # update window and on the GitHub release. Write and commit them first.
 # Sets the version in Resources/Info.plist (and bumps the build number); commit that.
+# If the build fails, or is only a test build, Info.plist is put back, so it can simply
+# be run again.
 # Notarizing needs a stored notarytool profile, made once with:
 #   xcrun notarytool store-credentials pane-notary --apple-id <id> --team-id <team>
 # SWITCHBOARD_NOTARY_PROFILE picks a different profile name.
@@ -47,6 +49,14 @@ OUT=build/release
 DMG="$OUT/Switchboard-$VERSION.dmg"
 SPARKLE_BIN=.build/artifacts/sparkle/Sparkle/bin
 
+STAGE=""
+BUILT=0
+cleanup() {
+  [ -z "$STAGE" ] || rm -rf "$STAGE"
+  [ "$BUILT" = 1 ] || git checkout -q -- "$PLIST"
+}
+trap cleanup EXIT
+
 # Version: the build number goes up by one each release.
 BUILD=$(( $(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST") + 1 ))
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
@@ -75,6 +85,8 @@ notarize() {
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
+# The source this is built from; publish.sh only publishes a commit that matches it.
+git rev-parse HEAD > "$OUT/source-commit"
 
 if [ "$NOTARIZE" = 1 ]; then
   ditto -c -k --keepParent "$APP" "$OUT/Switchboard.zip"
@@ -86,7 +98,6 @@ fi
 
 echo "==> Making $DMG"
 STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
 cp -R "$APP" "$STAGE/Switchboard.app"
 ln -s /Applications "$STAGE/Applications"
 hdiutil create -quiet -volname "Switchboard $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG"
@@ -100,6 +111,7 @@ else
   echo
   echo "Test build: $DMG"
   echo "Not notarized and not signed for Sparkle, so it can't be published or offered as an update."
+  echo "Resources/Info.plist is unchanged."
   exit 0
 fi
 
@@ -155,9 +167,11 @@ swift scripts/verify-signature.swift "$(cat scripts/sparkle-public-key.txt)" "$D
   echo "Requires macOS $MIN_OS or later. Runs on Apple silicon and Intel."
 } > "$OUT/notes.md"
 
+BUILT=1
 echo
 echo "Built:"
 ls -lh "$OUT"
 echo
-echo "Next: commit Resources/Info.plist (\"Version $VERSION (build $BUILD)\"), push main, then"
+echo "Next: commit only the version change, push main, then publish:"
+echo "  git commit -m \"Version $VERSION (build $BUILD)\" $PLIST && git push"
 echo "  scripts/publish.sh $VERSION"
