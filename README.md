@@ -28,6 +28,10 @@ or choose **Check for Updates…** at the bottom of the panel.
 - **Finder:** Show Hidden Files, Show Library Folder.
 - **System:** Mute, Mute Microphone, Keep Awake, Bluetooth.
 
+**Mute** and **Mute Microphone** work on whatever output and microphone your Mac is
+using right now, and show its name. Some devices, like many USB audio interfaces, have
+no mute switch; the row says so.
+
 **Keep Awake** can run until you turn it off, for 1 to 8 hours, or while a particular app
 is open (say, until Final Cut Pro finishes and quits). Use the clock button on its row.
 
