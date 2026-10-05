@@ -16,20 +16,49 @@ struct PomodoroSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             timerRow
-            Picker("Focus length", selection: Binding(
-                get: { model.focusMinutes },
-                set: { model.setFocusMinutes($0) })
-            ) {
-                ForEach(PomodoroSettings.focusChoices, id: \.self) { minutes in
-                    Text("\(minutes)m").tag(minutes)
+            HStack(spacing: 6) {
+                Picker("Focus length", selection: Binding(
+                    get: { model.focusMinutes },
+                    set: { model.setFocusMinutes($0) })
+                ) {
+                    ForEach(PomodoroSettings.focusChoices, id: \.self) { minutes in
+                        Text("\(minutes)m").tag(minutes)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.small)
+                .help("Focus length. Changes apply from the next focus session.")
+                alertMenu
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
-            .help("Focus length. Changes apply from the next focus session.")
         }
         .padding(.horizontal, 6)
+    }
+
+    /// How the end of a phase is announced: the sound, the pop-up, and a test.
+    private var alertMenu: some View {
+        Menu {
+            Picker("Sound", selection: Binding(
+                get: { model.alertSound ?? "" },
+                set: { model.setAlertSound($0.isEmpty ? nil : $0) })
+            ) {
+                Text("None").tag("")
+                Divider()
+                ForEach(PomodoroAlert.soundNames, id: \.self) { Text($0).tag($0) }
+            }
+            Toggle("Show Pop-up", isOn: Binding(
+                get: { model.showsPopUp },
+                set: { model.setShowsPopUp($0) }))
+            Divider()
+            Button("Test Alert") { model.testAlert() }
+        } label: {
+            Image(systemName: model.alertSound == nil ? "bell.slash" : "bell")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("How the end of a focus session or break is announced")
+        .accessibilityLabel("Alert sound and pop-up")
     }
 
     private var timerRow: some View {

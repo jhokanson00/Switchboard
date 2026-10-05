@@ -37,7 +37,10 @@ disks connected. If something is holding a drive, Eject names the app.
 
 **Pomodoro:** focus for 5, 25, 30, 45 or 60 minutes, then a 5-minute break, with a
 15-minute break after every fourth session. While it runs, the minutes left show in the
-menu bar, and a notification arrives when each phase ends.
+menu bar. When each phase ends, a sound plays three times and a pop-up stays in the middle
+of the screen until you answer it; Focus and Do Not Disturb don't hold either back. The
+bell next to the focus lengths picks the sound, turns the pop-up off (a notification is
+sent instead), or plays a test.
 
 **At a glance:** CPU and GPU load at the top of the panel.
 
