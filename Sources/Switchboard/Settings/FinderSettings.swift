@@ -3,12 +3,12 @@ import Foundation
 private let finder = "com.apple.finder"
 
 /// "Show Items: On Desktop" in System Settings → Desktop & Dock, stored as
-/// WindowManager's StandardHideDesktopIcons. The desktop follows it at once. Items in
-/// Stage Manager have their own setting, which is left alone.
+/// WindowManager's StandardHideDesktopIcons. The desktop follows it at once.
 ///
-/// Finder's older CreateDesktop hides the icons too, and Switchboard 1.0.x used it, so
-/// it counts as on as well. Showing the icons again turns it back on, which needs a
-/// Finder restart because Finder only reads it at launch.
+/// That setting doesn't apply while Stage Manager is on, so then Finder's older
+/// CreateDesktop hides the icons instead; it works in either mode, but Finder only reads
+/// it at launch, so it restarts. CreateDesktop being off (which Switchboard 1.0.x also
+/// used) counts as on, and showing the icons turns it back on.
 @MainActor
 final class HideDesktopIcons: SystemSetting {
     let id = "hideDesktopIcons"
@@ -18,15 +18,20 @@ final class HideDesktopIcons: SystemSetting {
     private let windowManager = "com.apple.WindowManager"
 
     func read() -> Reading {
-        let hidden = Prefs.bool("StandardHideDesktopIcons", in: windowManager) ?? false
+        let hidden = !stageManagerIsOn && (Prefs.bool("StandardHideDesktopIcons", in: windowManager) ?? false)
         return Reading(state: hidden || finderHidesDesktop ? .on : .off)
     }
 
     func write(_ on: Bool) async throws {
         Prefs.set("StandardHideDesktopIcons", on, in: windowManager)
-        if !on && finderHidesDesktop {
-            await FinderRestarter.shared.restart { Prefs.set("CreateDesktop", true, in: finder) }
+        let needsFinder = on ? stageManagerIsOn : finderHidesDesktop
+        if needsFinder {
+            await FinderRestarter.shared.restart { Prefs.set("CreateDesktop", !on, in: finder) }
         }
+    }
+
+    private var stageManagerIsOn: Bool {
+        Prefs.bool("GloballyEnabled", in: windowManager) ?? false
     }
 
     private var finderHidesDesktop: Bool {
