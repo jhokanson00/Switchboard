@@ -6,6 +6,7 @@ body:
     attributes:
       value: |
         Thanks for reporting! **Report a Bug…** at the bottom of Switchboard's panel fills in the versions below.
+        Please don't attach screenshots or recordings that show private information.
   - type: textarea
     id: what-happened
     attributes:

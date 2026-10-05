@@ -1,1 +1,6 @@
-blank_issues_enabled: true
+# The bug form asks for versions; security problems go to a private report instead.
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/jhokanson00/Switchboard/security/advisories/new
+    about: Please report it privately here, not as a public issue.
