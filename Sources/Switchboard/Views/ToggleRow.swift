@@ -22,6 +22,9 @@ struct ToggleRow: View {
             if let keepAwake = control.setting as? KeepAwake {
                 KeepAwakeMenu(keepAwake: keepAwake, board: board)
             }
+            if let mute = control.setting as? AudioMute, mute.devices.count > 1 {
+                AudioDeviceMenu(mute: mute)
+            }
             accessory
         }
         .padding(.horizontal, 6)
@@ -99,6 +102,34 @@ struct ToggleRow: View {
     private func flip() {
         guard canSwitch, let current = state.isOn else { return }
         Task { await board.set(control, to: !current) }
+    }
+}
+
+/// Switches the Mac's output or microphone, the device the row mutes.
+private struct AudioDeviceMenu: View {
+    let mute: AudioMute
+
+    private var isOutput: Bool { mute.direction == .output }
+
+    var body: some View {
+        Menu {
+            Picker(isOutput ? "Output" : "Microphone", selection: Binding(
+                get: { mute.device },
+                set: { mute.select($0) })
+            ) {
+                ForEach(mute.devices) { device in
+                    Text(device.name).tag(device.id)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: isOutput ? "hifispeaker" : "mic")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(isOutput ? "Choose the sound output" : "Choose the microphone")
+        .accessibilityLabel(isOutput ? "Sound output" : "Microphone")
     }
 }
 

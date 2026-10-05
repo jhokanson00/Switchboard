@@ -1,11 +1,20 @@
 import CoreAudio
 import Foundation
+import Observation
 
 /// Mutes the current output device (sound) or input device (microphone) through
 /// CoreAudio, and follows it when the default device changes. Some devices (many USB
 /// audio interfaces) have no mute control at all; the row says so instead of pretending.
+/// The row's menu also switches the Mac to another output or microphone, like the Sound
+/// menu in Control Center.
 @MainActor
+@Observable
 final class AudioMute: SystemSetting {
+    struct Device: Identifiable, Equatable {
+        let id: AudioObjectID
+        let name: String
+    }
+
     enum Direction {
         case output, input
     }
@@ -15,7 +24,7 @@ final class AudioMute: SystemSetting {
     let symbol: String
     let restorable = false
 
-    private let direction: Direction
+    let direction: Direction
     private let scope: AudioObjectPropertyScope
     private let defaultDeviceAddress: AudioObjectPropertyAddress
 
@@ -36,12 +45,16 @@ final class AudioMute: SystemSetting {
     }
 
     private let system = AudioObjectID(kAudioObjectSystemObject)
-    private var device = AudioObjectID(kAudioObjectUnknown)
-    private var changed: (@MainActor () -> Void)?
-    private var deviceListener: AudioObjectPropertyListenerBlock?
-    private var muteListener: AudioObjectPropertyListenerBlock?
+    /// The device the Mac is using now.
+    private(set) var device = AudioObjectID(kAudioObjectUnknown)
+    /// The devices it could switch to, by name.
+    private(set) var devices: [Device] = []
+    @ObservationIgnored private var changed: (@MainActor () -> Void)?
+    @ObservationIgnored private var deviceListener: AudioObjectPropertyListenerBlock?
+    @ObservationIgnored private var deviceListListener: AudioObjectPropertyListenerBlock?
+    @ObservationIgnored private var muteListener: AudioObjectPropertyListenerBlock?
     /// Elements the mute listener is attached to on `device`.
-    private var listenedElements: [AudioObjectPropertyElement] = []
+    @ObservationIgnored private var listenedElements: [AudioObjectPropertyElement] = []
 
     private static let candidateElements: [AudioObjectPropertyElement] = [kAudioObjectPropertyElementMain, 1, 2]
 
@@ -89,6 +102,25 @@ final class AudioMute: SystemSetting {
         var address = defaultDeviceAddress
         AudioObjectAddPropertyListenerBlock(system, &address, .main, deviceListener)
         followDefaultDevice()
+
+        // Devices plugged in or removed.
+        let deviceListListener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.loadDevices() }
+        }
+        self.deviceListListener = deviceListListener
+        var devicesAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        AudioObjectAddPropertyListenerBlock(system, &devicesAddress, .main, deviceListListener)
+        loadDevices()
+    }
+
+    /// Makes `id` the Mac's output or microphone. The row follows once CoreAudio reports it.
+    func select(_ id: AudioObjectID) {
+        guard id != device else { return }
+        var address = defaultDeviceAddress
+        var id = id
+        AudioObjectSetPropertyData(system, &address, 0, nil, UInt32(MemoryLayout<AudioObjectID>.size), &id)
     }
 
     // MARK: Device
@@ -118,6 +150,39 @@ final class AudioMute: SystemSetting {
         }
     }
 
+    /// Every device with sound going this way that macOS offers as a choice: not hidden,
+    /// and allowed to be the default (as in Control Center's Sound menu).
+    private func loadDevices() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr else { return }
+        var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &ids) == noErr else { return }
+
+        let found = ids.filter { id in
+            var streams = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreams, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+            var streamsSize: UInt32 = 0
+            guard AudioObjectGetPropertyDataSize(id, &streams, 0, nil, &streamsSize) == noErr, streamsSize > 0 else { return false }
+            return !flag(kAudioDevicePropertyIsHidden, of: id, scope: kAudioObjectPropertyScopeGlobal, default: false)
+                && flag(kAudioDevicePropertyDeviceCanBeDefaultDevice, of: id, scope: scope, default: true)
+        }
+        .map { Device(id: $0, name: name(of: $0) ?? "Unnamed device") }
+        .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        if found != devices { devices = found }
+    }
+
+    private func flag(_ selector: AudioObjectPropertySelector, of id: AudioObjectID, scope: AudioObjectPropertyScope, default fallback: Bool) -> Bool {
+        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectHasProperty(id, &address),
+              AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr
+        else { return fallback }
+        return value != 0
+    }
+
     /// The main mute control if there is one, else per-channel ones (left and right).
     private func muteElements() -> [AudioObjectPropertyElement] {
         let settable = Self.candidateElements.filter { element in
@@ -135,13 +200,17 @@ final class AudioMute: SystemSetting {
     }
 
     private func deviceName() -> String? {
+        name(of: device)
+    }
+
+    private func name(of id: AudioObjectID) -> String? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioObjectPropertyName,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain)
         var name: Unmanaged<CFString>?
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &name) == noErr else { return nil }
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &name) == noErr else { return nil }
         return name?.takeRetainedValue() as String?
     }
 
