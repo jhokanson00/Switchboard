@@ -135,9 +135,15 @@ cat > "$OUT/appcast.xml" <<EOF
 </rss>
 EOF
 # Sign the feed itself, so a changed appcast (other notes, links, versions) is refused
-# by Switchboard (SURequireSignedFeed). Nothing may edit it after this.
+# by Switchboard (SURequireSignedFeed). Nothing may edit it after this. sign_update signs
+# even XML it can't parse, so check it parses, and check the signature against the
+# public key users have, not the keychain's.
+xmllint --noout "$OUT/appcast.xml"
 "$SPARKLE_BIN/sign_update" --account Switchboard "$OUT/appcast.xml"
-"$SPARKLE_BIN/sign_update" --account Switchboard --verify "$OUT/appcast.xml"
+xmllint --noout "$OUT/appcast.xml"
+swift scripts/verify-signature.swift "$(cat scripts/sparkle-public-key.txt)" "$OUT/appcast.xml"
+swift scripts/verify-signature.swift "$(cat scripts/sparkle-public-key.txt)" "$DMG" \
+  "$(sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p' <<<"$SIGNATURE")"
 
 # The GitHub release: the same notes, plus how to install.
 {

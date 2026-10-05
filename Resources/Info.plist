@@ -36,5 +36,9 @@
 	<string>https://github.com/jhokanson00/Switchboard/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>TDDY1E5JvVcKlaAAspcGfm9+dYwKri8MPzqGBetKe2s=</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>
