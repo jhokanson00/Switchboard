@@ -225,6 +225,11 @@ Notarizing needs a stored profile, made once:
 xcrun notarytool store-credentials pane-notary --apple-id <your Apple ID> --team-id <team ID>
 ```
 
+
+## Author
+
+Made by [Jacob Hokanson](https://jlh.ca), who builds web and Mac software in Victoria, BC. More of his apps and tools are at [jlh.ca/tools](https://jlh.ca/tools).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
