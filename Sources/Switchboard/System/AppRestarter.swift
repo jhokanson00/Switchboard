@@ -36,7 +36,8 @@ final class DockRestarter {
 /// quits, so a change made only while it's running is lost. So changes are written
 /// before Finder quits (in case it has to be forced, when macOS starts it again at once)
 /// and again once it's closed; then it opens again. Afterwards any folder windows Finder
-/// didn't restore by itself are reopened. Changes made close together share one restart.
+/// didn't restore by itself are reopened where they were. Changes made close together
+/// share one restart.
 @MainActor
 final class FinderRestarter {
     static let shared = FinderRestarter()
@@ -45,6 +46,13 @@ final class FinderRestarter {
     private let url = URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app")
     private var changes: [() -> Void] = []
     private var pending: Task<Void, Never>?
+
+    /// A Finder window showing a folder, e.g. "/Users/me/Documents/", and its left, top,
+    /// right and bottom edges.
+    private struct FolderWindow {
+        let path: String
+        let bounds: [Int]?
+    }
 
     func restart(applying change: @escaping () -> Void) async {
         changes.append(change)
@@ -66,7 +74,7 @@ final class FinderRestarter {
 
     private func run() async {
         try? await Task.sleep(for: .milliseconds(300))
-        let folders = await openFolders()
+        let windows = await openFolders()
         let batch = changes
         changes = []
 
@@ -80,38 +88,60 @@ final class FinderRestarter {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
         _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: configuration)
-        await reopen(folders)
+        await reopen(windows)
     }
 
-    /// Folders shown in Finder windows, e.g. "/Users/me/Documents/". Windows without a
-    /// folder (Recents, AirDrop) are left out.
-    private func openFolders() async -> [String] {
-        // One URL per line: URLs never contain line breaks, but folder names can contain
-        // commas, which AppleScript's own list output would be split on.
+    /// Finder's folder windows, front to back. Windows without a folder (Recents,
+    /// AirDrop) are left out.
+    private func openFolders() async -> [FolderWindow] {
+        // One window per line, its URL and edges separated by a tab: URLs never contain
+        // tabs or line breaks, but folder names can contain commas, which AppleScript's own
+        // list output would be split on.
         let script = """
-            tell application "Finder" to set folderURLs to URL of target of every Finder window
+            tell application "Finder"
+                set folderURLs to URL of target of every Finder window
+                set windowBounds to bounds of every Finder window
+            end tell
+            set windowLines to {}
+            repeat with i from 1 to count of folderURLs
+                set {l, t, r, b} to item i of windowBounds
+                set end of windowLines to (item i of folderURLs as text) & tab & l & "," & t & "," & r & "," & b
+            end repeat
             set AppleScript's text item delimiters to linefeed
-            return folderURLs as text
+            return windowLines as text
             """
         guard !running().isEmpty, let result = try? await AppleScript.run(script) else { return [] }
-        return result.components(separatedBy: .newlines)
-            .compactMap { URL(string: $0)?.path(percentEncoded: false) }
+        return result.components(separatedBy: .newlines).compactMap { line in
+            let parts = line.components(separatedBy: "\t")
+            guard parts.count == 2, let path = URL(string: parts[0])?.path(percentEncoded: false) else { return nil }
+            let bounds = parts[1].components(separatedBy: ",").compactMap { Int($0) }
+            return FolderWindow(path: path, bounds: bounds.count == 4 ? bounds : nil)
+        }
     }
 
-    /// Reopens the folders Finder had open, except those it restored by itself: with
-    /// "Close windows when quitting an application" off in System Settings, Finder
-    /// brings its windows back on its own.
-    private func reopen(_ folders: [String]) async {
-        guard !folders.isEmpty else { return }
+    /// Reopens the folder windows Finder had open, where they were, except those it
+    /// restored by itself: with "Close windows when quitting an application" off in
+    /// System Settings, Finder brings its windows back on its own.
+    private func reopen(_ windows: [FolderWindow]) async {
+        guard !windows.isEmpty else { return }
         // Give Finder a moment to put its own windows back.
         try? await Task.sleep(for: .milliseconds(1500))
-        var missing = folders
+        var missing = windows
         for open in await openFolders() {
-            if let index = missing.firstIndex(of: open) { missing.remove(at: index) }
+            if let index = missing.firstIndex(where: { $0.path == open.path }) { missing.remove(at: index) }
         }
-        for folder in missing {
-            let path = folder.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-            _ = try? await AppleScript.run("tell application \"Finder\" to make new Finder window to (POSIX file \"\(path)\" as alias)")
+        // Back to front, so the window that was in front ends up in front again.
+        for window in missing.reversed() {
+            let path = window.path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+            var script = """
+                tell application "Finder"
+                    set newWindow to make new Finder window to (POSIX file "\(path)" as alias)
+                """
+            if let bounds = window.bounds {
+                script += "\n    set bounds of newWindow to {\(bounds.map(String.init).joined(separator: ", "))}"
+            }
+            script += "\nend tell"
+            _ = try? await AppleScript.run(script)
         }
     }
 
