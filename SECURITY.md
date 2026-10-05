@@ -7,14 +7,15 @@ Please don't open a public issue for a security problem. Report it privately ins
 (or the **Security** tab → **Report a vulnerability**).
 
 Include what you found, how to reproduce it, and your Switchboard and macOS versions
-(both are at the bottom of the panel and in  → About This Mac). You'll get a reply as
-soon as possible. Fixes ship as a new release, which Switchboard installs on its own.
-Say if you'd like to be credited in the release notes.
+(Switchboard's is at the bottom of the panel, macOS's in  → About This Mac). You'll get
+a reply as soon as possible. Fixes ship as a new release, which every copy of Switchboard
+finds within a day and offers to install. Say if you'd like to be credited in the
+release notes.
 
 ## Supported versions
 
-Only the latest release. Switchboard checks for updates once a day, so fixes reach
-everyone without them doing anything.
+Only the latest release. Switchboard checks for updates once a day and offers to install
+a new release when it finds one.
 
 ## In scope
 

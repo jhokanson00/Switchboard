@@ -30,8 +30,9 @@ or choose **Check for Updates…** at the bottom of the panel.
 - **System:** Mute, Mute Microphone, Keep Awake, Bluetooth.
 
 **Mute** and **Mute Microphone** work on whatever output and microphone your Mac is
-using right now, and show its name. The speaker and mic buttons on those rows switch to
-another output or microphone, like the Sound menu in Control Center. Some devices, like
+using right now, and show its name. When there's more than one, the speaker and mic
+buttons on those rows switch to another output or microphone, like the Sound menu in
+Control Center. Some devices, like
 many USB audio interfaces, have no mute switch; the row says so.
 
 **Keep Awake** can run until you turn it off, for 1 to 8 hours, or while a particular app
@@ -75,16 +76,16 @@ Empty Trash is the one action that can't be undone, so it always asks first.
 
 ## Privacy and security
 
-Switchboard runs entirely on your Mac. It has no accounts, analytics or tracking. Its
-only network request is the update check, which downloads a small file from this repo's
-GitHub releases.
+Switchboard runs entirely on your Mac. It has no accounts, analytics or tracking. It goes
+online only for updates: once a day it downloads a small file from this repo's GitHub
+releases to see if there's a new version, and when you install one, the update itself.
 
 macOS asks for each permission the first time it's needed:
 
 - **Automation → System Events:** Dark Mode, Autohide Dock, Autohide Menu Bar.
 - **Automation → Finder:** Empty Trash, and reopening your Finder windows after a Finder
   setting changes.
-- **Bluetooth:** only once you click **Allow…** on the Bluetooth row.
+- **Bluetooth:** only once you click **Allow…** on the Bluetooth row, or press its shortcut.
 - **Notifications:** only if you turn off the Pomodoro pop-up.
 
 Switchboard never listens to your microphone. Mute Microphone flips the microphone's own
@@ -96,26 +97,27 @@ mute switch, and the app isn't entitled to record audio, so macOS wouldn't even 
   and notarized by Apple, so macOS confirms it came from the developer and hasn't been
   changed.
 - **One extra capability.** Switchboard runs with the hardened runtime and asks macOS for
-  a single entitlement: sending Apple Events, to System Events and Finder. It can't be
-  attached to by other apps, ignores code-injection environment variables, and loads only
-  code signed by Apple or its developer, from inside the app. So other software can't
-  slip code into it and borrow the permissions you've given it.
+  a single entitlement: sending Apple Events, which it uses only for System Events and
+  Finder (macOS asks you before each). It can't be attached to by other apps, ignores
+  code-injection environment variables, and loads only code signed by Apple or its
+  developer; its one outside library, Sparkle, loads only from inside the app. So other
+  software can't slip code into it and borrow the permissions you've given it.
 - **Nothing else can drive it.** No URL scheme, no AppleScript dictionary, no services,
   no network ports. It acts only on your clicks and your keyboard shortcuts.
 - **No shell.** The AppleScript it runs goes to Apple's own `osascript`, never a shell.
   The only outside text that reaches a script, a Finder folder's path, is escaped and
   passed privately, not on a command line other programs can read.
 - **Updates that can't be forged.** Sparkle checks once a day over HTTPS. The update feed
-  and every download are signed with the developer's private key, which never leaves the
-  developer's Mac, and Switchboard checks both against the key built into it before
-  anything is unpacked. It won't install an older version. (The feed itself is signed
-  from 1.0.5 on.)
-- **Releases that can't be swapped.** Published releases on this repo are immutable and
-  their tags protected, so a download can't be replaced once it's out. Before anything is
-  published, a script checks the app inside the `.dmg` again: signature, notarization,
-  entitlements and update key.
-- **One dependency.** [Sparkle](https://sparkle-project.org), for updates, pinned to an
-  exact version and checksum, with GitHub's security alerts on.
+  and every download are signed with the developer's private key, which only the
+  developer has, and Switchboard checks both against the key built into it before
+  anything is unpacked. It won't install an older version. (Copies before 1.0.5 check
+  only the download's signature, before installing it.)
+- **Releases that can't be swapped.** From 1.0.5 on, releases on this repo can't be
+  changed once published, so a download can't be replaced once it's out, and release tags
+  can't be moved or deleted. Before anything is published, a script checks the app inside
+  the `.dmg` again: signature, notarization, entitlements and update key.
+- **One dependency.** [Sparkle](https://sparkle-project.org), for updates, pinned to one
+  exact version, whose download is checked against a fixed checksum.
 
 Switchboard isn't sandboxed: its job is changing settings that belong to Finder, the Dock
 and macOS, which the App Sandbox doesn't allow. The protections above are what keep that
@@ -174,7 +176,8 @@ interfaces) have no mute control; the Mute row says so for those.
 ## Report a bug
 
 Choose **Report a Bug…** at the bottom of the panel. It opens a GitHub issue with
-your Switchboard and macOS versions filled in. Or
+your Switchboard and macOS versions and Mac model filled in, for you to check before
+sending. Or
 [open an issue](https://github.com/jhokanson00/Switchboard/issues/new/choose) directly.
 
 ## Building from source
@@ -207,7 +210,8 @@ in the keychain and the hardened runtime, notarizes and staples the app and the 
 signs the `.dmg` and then the whole `appcast.xml` for Sparkle with the EdDSA key in the
 keychain (`generate_keys --account Switchboard`; its public half is `SUPublicEDKey`),
 and runs `scripts/check-app.sh`, which refuses any entitlement but Apple Events, any
-library search path outside the app, and anything not notarized. Without a Developer ID
+library search path outside the app (other than the system's Swift libraries), and
+anything not notarized. Without a Developer ID
 certificate it makes a test build that can't be published. `publish.sh` repeats the
 checks on the app inside the `.dmg`, verifies both signatures, and only publishes from
 the pushed commit that sets the version. Each release carries its own `appcast.xml`,
