@@ -40,7 +40,8 @@ disks connected. If something is holding a drive, Eject names the app.
 menu bar. When each phase ends, a sound plays three times and a pop-up stays in the middle
 of the screen until you answer it; Focus and Do Not Disturb don't hold either back. The
 bell next to the focus lengths picks the sound, turns the pop-up off (a notification is
-sent instead), or plays a test.
+sent instead), or plays a test. While the timer runs, the Mac doesn't go to sleep on its own,
+so the end isn't missed; the display still can.
 
 **At a glance:** CPU and GPU load at the top of the panel.
 

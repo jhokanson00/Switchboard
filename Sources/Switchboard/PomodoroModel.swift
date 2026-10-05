@@ -16,9 +16,11 @@ final class PomodoroModel {
     /// Minutes left, for the menu bar. Nil when the timer isn't running.
     private(set) var menuBarText: String?
 
-    /// The sound played three times when a phase ends; nil for none.
-    private(set) var alertSound: String? = UserDefaults.standard.object(forKey: soundKey) == nil
-        ? "Glass" : UserDefaults.standard.string(forKey: soundKey)
+    /// The sound played three times when a phase ends; nil for none, saved as "".
+    private(set) var alertSound: String? = {
+        guard let saved = UserDefaults.standard.string(forKey: soundKey) else { return "Glass" }
+        return saved.isEmpty ? nil : saved
+    }()
     /// A pop-up in the middle of the screen when a phase ends, instead of a notification.
     private(set) var showsPopUp = UserDefaults.standard.object(forKey: popUpKey) as? Bool ?? true
 
@@ -33,6 +35,7 @@ final class PomodoroModel {
 
     func start() {
         if !showsPopUp { notifications.requestPermissionOnce() }
+        PomodoroAlert.dismiss()
         timer.start(at: .now)
         changed()
     }
@@ -43,11 +46,13 @@ final class PomodoroModel {
     }
 
     func skip() {
+        PomodoroAlert.dismiss()
         timer.skip(at: .now)
         changed()
     }
 
     func reset() {
+        PomodoroAlert.dismiss()
         timer.reset()
         changed()
     }
@@ -68,7 +73,9 @@ final class PomodoroModel {
         _ = timer.advance(to: now)
         changed()
         if let last = ended.last, now.timeIntervalSince(last.date) < 10 * 60 {
-            announce(last.event)
+            // On the next turn: this also runs while SwiftUI is building the app or the
+            // panel, and opening a window then aborts the app.
+            Task { [weak self] in self?.announce(last.event) }
         }
     }
 
@@ -92,11 +99,13 @@ final class PomodoroModel {
     /// What the end of a focus session will look and sound like.
     func testAlert() {
         if let alertSound { PomodoroAlert.play(alertSound) }
-        guard showsPopUp else { return }
-        PomodoroAlert.show(
-            symbol: "bell", title: "Focus session done",
-            message: "This is a test. When a focus session or break ends, you'll hear and see this.",
-            choices: [.init(title: "OK") {}])
+        let message = "This is a test. When a focus session or break ends, you'll hear and see this."
+        if showsPopUp {
+            PomodoroAlert.show(symbol: "bell", title: "Focus session done", message: message,
+                               choices: [.init(title: "OK") {}])
+        } else {
+            notifications.showNow(title: "Focus session done", body: message)
+        }
     }
 
     private func announce(_ event: Pomodoro.Event) {
@@ -138,11 +147,12 @@ final class PomodoroModel {
     }
 
     /// Without this, macOS may nap Switchboard while it has no windows open and wake it
-    /// late, so the sound and pop-up would come after the phase ended.
+    /// late, or let the Mac go to sleep, so the sound and pop-up would come after the
+    /// phase ended, or not at all. The display can still sleep.
     private func keepAwakeWhileRunning() {
         if timer.isRunning, activity == nil {
             activity = ProcessInfo.processInfo.beginActivity(
-                options: .userInitiatedAllowingIdleSystemSleep, reason: "Pomodoro timer running")
+                options: .userInitiated, reason: "Pomodoro timer running")
         } else if !timer.isRunning, let activity {
             ProcessInfo.processInfo.endActivity(activity)
             self.activity = nil
@@ -206,6 +216,14 @@ private final class NotificationPresenter: NSObject, UNUserNotificationCenterDel
         guard !askedForPermission else { return }
         askedForPermission = true
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    /// Shows a notification at once, for Test Alert.
+    func showNow(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        center.add(UNNotificationRequest(identifier: "pomodoro-test", content: content, trigger: nil))
     }
 
     func schedule(_ upcoming: [(date: Date, event: Pomodoro.Event)], settings: PomodoroSettings) {

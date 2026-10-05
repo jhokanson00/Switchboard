@@ -21,9 +21,12 @@ enum PomodoroAlert {
             URL(fileURLWithPath: "/System/Library/Sounds"),
             FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Sounds"),
         ]
+        let soundTypes: Set<String> = ["aiff", "aif", "wav", "caf", "mp3", "m4a"]
         let names = folders.flatMap {
-            (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? []
+            (try? FileManager.default.contentsOfDirectory(
+                at: $0, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
         }
+        .filter { soundTypes.contains($0.pathExtension.lowercased()) }
         .map { $0.deletingPathExtension().lastPathComponent }
         return Array(Set(names)).sorted()
     }()
